@@ -1,4 +1,4 @@
-# twitch_translate_bot
+# Kine's Twitch Translate Bot
 
 Simple example of a translation bot for Twitch
 Uses google translate througe googletrans npm package. It doesn't require a key, but it has some limitations. And you can easily adapt the script to use another API, eventually with your own API key.
