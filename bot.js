@@ -129,6 +129,7 @@ const ignoreWords = [
 
 let botName = process.env.CHANNEL_NAME;
 let botPassword = process.env.CHANNEL_PASSWORD;
+let broadcastChannel = process.env.BROADCAST_CHANNEL;
 
 // If no channel & password, then exit...
 if ((botName == undefined) || (botPassword == undefined)) {
@@ -144,7 +145,8 @@ const opts = {
     password: botPassword
   },
   channels: [
-    'jan_levinson_i_presume'
+    // channel name goes here
+    broadcastChannel
   ],
   // Automatic reconnection
   connection: { reconnect: true }
@@ -216,7 +218,7 @@ function onMessageHandler(target, context, msg, self) {
       const message = txt?.toString().toLowerCase().trim()
 
       if (ignoreWords.includes(message)) {
-        console.log('txt is in the building', txt)
+        console.log('Ignoring this word', txt)
         return;
       }
       if (message?.length <= 2) {
