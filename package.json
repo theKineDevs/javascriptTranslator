@@ -4,12 +4,21 @@
   "description": "Simple Standalone Twitch Bot Test",
   "main": "bot.js",
   "dependencies": {
+    "@vitalets/google-translate-api": "^8.0.0",
     "dotenv": "^16.0.1",
     "googletrans": "^1.0.0",
+    "nodemon": "^2.0.19",
+    "ramda": "^0.28.0",
     "tmi.js": "^1.5.0"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "@babel/cli": "^7.18.9",
+    "@babel/core": "^7.18.9",
+    "@babel/preset-env": "^7.18.9",
+    "babel-watch": "^7.7.0"
+  },
   "scripts": {
+    "dev": "babel-watch bot.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

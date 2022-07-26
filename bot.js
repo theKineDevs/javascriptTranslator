@@ -1,7 +1,9 @@
 // Kine's Translator Bot for Twitch
-require('dotenv').config();
-const tmi = require('tmi.js');
-const gtrans = require('googletrans').default;
+import dotenv from 'dotenv';
+dotenv.config();
+import tmi from 'tmi.js';
+import gtrans from 'googletrans';
+import { isEmpty, isNil } from 'ramda';
 const ignoreUsers = ['Nightbot', 'BikuBikuTest']
 const ignoreWords = [
   'http', 'thekineDumpy', 'nt', 'ntnt', '<3',
@@ -137,7 +139,7 @@ if ((botName == undefined) || (botPassword == undefined)) {
   process.exit(-1);
 }
 // add oauth: before botPassword
-botPassword = 'oauth:' + botPassword;
+botPassword = `oauth:${botPassword}`;
 
 const opts = {
   identity: {
@@ -162,34 +164,40 @@ const tr_lang = {
   'ja': ['ja', ''],
 };
 
-// Register our event handlers (defined below)
-client.on('message', onMessageHandler);
-client.on('connected', onConnectedHandler);
+const deeplLangugageDictionary = {
+  'de': 'DE', 'en': 'EN', 'fr': 'FR', 'es': 'ES', 'pt': 'PT',
+  'it': 'IT', 'nl': 'NL', 'pl': 'PL', 'ru': 'RU', 'ja': 'JA', 'zh-CN': 'ZH'
+};
+
+const checkForNonTranslate = (msg, self, context) => {
+  if (self) {
+    return false;
+  } else if (msg[0] === '!') {
+    return false;
+  } else if (msg?.trim()?.split(' ')?.includes(':')) {
+    return false;
+  } else if (ignoreUsers.includes(context?.username)) {
+    return false;
+  } else if (!isNil(context?.emotes)) {
+    return false;
+  }
+  return true;
+}
 
 // Connect to Twitch:
 client.connect();
 
 // Called every time a message comes in
-function onMessageHandler(target, context, msg, self) {
-  // implement variable to change target trans lang
-  if (msg[0] === '!') {
+const onMessageHandler = async (target, context, msg, self) => {
+  console.log('context', context)
+  if (checkForNonTranslate(msg, self, context) === false) {
+    console.log('contains a bad message')
     return;
-  };
-  const userSending = context?.username;
-  if (ignoreUsers.includes(userSending)) {
-    return;
-  };
-
-  try {
-
-    // Ignore messages from the bot
-    if (self) { return; }
-
+  } else {
     // Remove whitespace from chat message
-    let tMsg = '!ja' + ' ' + msg.trim();
+    let tMsg = msg.trim();
+    console.log('tMsg', tMsg)
 
-    // Check if the message starts with @name
-    // in that case, extract the name and move the @name at the end of the message, and process
     if (tMsg[0] === '@') {
       let atnameEndIndex = tMsg.indexOf(' ');
       let atname = tMsg.substring(0, atnameEndIndex);
@@ -197,71 +205,65 @@ function onMessageHandler(target, context, msg, self) {
       tMsg = msg + ' ' + atname;
       console.info('Changed message :', tMsg);
     }
-    // Filter commands (options)
-    if (tMsg[0] != '!') return;
 
     // Extract command
     let cmd = tMsg.split(' ')[0].substring(1).toLowerCase();
-
     // Name for answering
     let answername = '@' + context['display-name'];
 
-    // Command for displaying the commands (in english)
-    if (cmd === "lang" || cmd === "translate") {
-      client.say(target, 'I can (approximatevely) translate your messages in many languages. Simply start your message with one of these commands: !en (english) !fr (french)  !de (german) !pt (portuguese)... ');
+    let txt = tMsg;
+    const message = txt?.toString().toLowerCase().trim()
+
+    if (ignoreWords.includes(message)) {
+      console.log('Ignoring this word', txt)
+      return;
+    }
+    if (message?.length <= 2) {
       return;
     }
 
-    if (cmd in tr_lang) {
-      var ll = tr_lang[cmd];
-      var txt = tMsg.substring(1 + cmd.length);
-      const message = txt?.toString().toLowerCase().trim()
-
-      if (ignoreWords.includes(message)) {
-        console.log('Ignoring this word', txt)
-        return;
+    // Text must be at least 2 characters and max 200 characters
+    let lazy = false;
+    if (txt.length > 2) {
+      if (txt.length > 200) {
+        lazy = true;
+        txt = "i'm too lazy to translate long sentences ^^";
       }
-      if (message?.length <= 2) {
-        return;
-      }
-
-      // Text must be at least 2 characters and max 200 characters
-      var lazy = false;
-      if (txt.length > 2) {
-        if (txt.length > 200) {
-          lazy = true;
-          txt = "i'm too lazy to translate long sentences ^^";
-        }
-
-        // Lazy mode, and english target => no translation, only displays 'lazy' message in english
-        if ((lazy === true) && (ll[0].indexOf('en') == 0)) {
-          say(target, context['display-name'] + ', ' + txt);
-          return;
-        }
-
+      try {
         // Translate text
-        gtrans(txt, { to: ll[0] }).then(res => {
-          if (lazy === true) {
-            // lazy mode sentence in english and also in requested language
-            client.say(target, context['display-name'] + ', ' + txt + '/' + res.text);
+        const ogTrans = await gtrans(txt);
+        if (lazy === true) {
+          let lazyTr;
+          if (ogTrans?.src === 'ja') {
+            lazyTr = await gtrans(txt, { to: 'en' });
+          } else if (ogTrans?.src === 'en') {
+            lazyTr = await gtrans(txt, { to: 'ja' });
           }
-          else {
-            // Translation
-            client.say(target, context['display-name'] + ' ' + ll[1] + ': ' + res.text);
+          return client.say(target, `${context['display-name']}, ${txt}`);
+        }
+        else {
+          let textTr;
+          let lang;
+          if (ogTrans?.src === 'ja') {
+            textTr = await gtrans(txt, { to: 'en' });
+            lang = '[ja > en]';
+          } else if (ogTrans?.src === 'en') {
+            textTr = await gtrans(txt, { to: 'ja' });
+            lang = '[en > ja]'
           }
-        }).catch(err => {
-          console.error('Translation Error:', err);
-        })
+          client.say(target, context['display-name'] + ' ' + lang + ': ' + textTr.text);
+        }
+      } catch (err) {
+        console.error('Translation Error:', err);
       }
+
     }
   }
-  catch (e) {
-    console.error(e.stack);
-  }
-
-
 }
 
+// Register our event handlers (defined below)
+client.on('message', onMessageHandler);
+client.on('connected', onConnectedHandler);
 // Called every time the bot connects to Twitch chat
 function onConnectedHandler(addr, port) {
   console.log(`* Connected to ${addr}:${port}`);
